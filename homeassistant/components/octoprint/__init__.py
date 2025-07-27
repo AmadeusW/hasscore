@@ -33,7 +33,23 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import slugify as util_slugify
 from homeassistant.util.ssl import get_default_context, get_default_no_verify_context
 
-from .const import CONF_BAUDRATE, DOMAIN, SERVICE_CONNECT
+from .const import (
+    CONF_BAUDRATE,
+    CONF_BED_TEMP,
+    CONF_TOOL_TEMP,
+    CONF_X_OFFSET,
+    CONF_X_POSITION,
+    CONF_Y_OFFSET,
+    CONF_Y_POSITION,
+    CONF_Z_OFFSET,
+    CONF_Z_POSITION,
+    DOMAIN,
+    SERVICE_CONNECT,
+    SERVICE_MOVE_TOOL,
+    SERVICE_SET_BED_TEMP,
+    SERVICE_SET_POSITION,
+    SERVICE_SET_TOOL_TEMP,
+)
 from .coordinator import OctoprintDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,7 +72,7 @@ def ensure_valid_path(value):
     return value
 
 
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.CAMERA, Platform.SENSOR, Platform.TEXT]
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.CAMERA, Platform.SENSOR]
 DEFAULT_NAME = "OctoPrint"
 CONF_NUMBER_OF_TOOLS = "number_of_tools"
 CONF_BED = "bed"
@@ -133,6 +149,38 @@ SERVICE_CONNECT_SCHEMA = vol.Schema(
         vol.Optional(CONF_PROFILE_NAME): cv.string,
         vol.Optional(CONF_PORT): cv.string,
         vol.Optional(CONF_BAUDRATE): cv.positive_int,
+    }
+)
+
+SERVICE_SET_TOOL_TEMP_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_DEVICE_ID): cv.string,
+        vol.Required(CONF_TOOL_TEMP): vol.All(vol.Coerce(int), vol.Range(min=0, max=400)),
+    }
+)
+
+SERVICE_SET_BED_TEMP_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_DEVICE_ID): cv.string,
+        vol.Required(CONF_BED_TEMP): vol.All(vol.Coerce(int), vol.Range(min=0, max=150)),
+    }
+)
+
+SERVICE_MOVE_TOOL_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_DEVICE_ID): cv.string,
+        vol.Optional(CONF_X_OFFSET): vol.All(vol.Coerce(float), vol.Range(min=-500, max=500)),
+        vol.Optional(CONF_Y_OFFSET): vol.All(vol.Coerce(float), vol.Range(min=-500, max=500)),
+        vol.Optional(CONF_Z_OFFSET): vol.All(vol.Coerce(float), vol.Range(min=-500, max=500)),
+    }
+)
+
+SERVICE_SET_POSITION_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_DEVICE_ID): cv.string,
+        vol.Optional(CONF_X_POSITION): vol.All(vol.Coerce(float), vol.Range(min=0, max=500)),
+        vol.Optional(CONF_Y_POSITION): vol.All(vol.Coerce(float), vol.Range(min=0, max=500)),
+        vol.Optional(CONF_Z_POSITION): vol.All(vol.Coerce(float), vol.Range(min=0, max=500)),
     }
 )
 
@@ -220,12 +268,100 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             baud_rate=call.data.get(CONF_BAUDRATE),
         )
 
+    async def async_set_tool_temperature(call: ServiceCall) -> None:
+        """Set tool temperature."""
+        client = async_get_client_for_service_call(hass, call)
+        temperature = call.data[CONF_TOOL_TEMP]
+        await client.set_tool_temperature(temperature, tool="tool0")
+
+    async def async_set_bed_temperature(call: ServiceCall) -> None:
+        """Set bed temperature."""
+        client = async_get_client_for_service_call(hass, call)
+        temperature = call.data[CONF_BED_TEMP]
+        await client.set_bed_temperature(temperature)
+
+    async def async_move_tool(call: ServiceCall) -> None:
+        """Move tool by relative offsets."""
+        client = async_get_client_for_service_call(hass, call)
+        command = {"command": "jog"}
+        
+        if CONF_X_OFFSET in call.data:
+            command["x"] = call.data[CONF_X_OFFSET]
+        if CONF_Y_OFFSET in call.data:
+            command["y"] = call.data[CONF_Y_OFFSET]
+        if CONF_Z_OFFSET in call.data:
+            command["z"] = call.data[CONF_Z_OFFSET]
+            
+        await client.issue_tool_command(command)
+
+    async def async_set_position(call: ServiceCall) -> None:
+        """Set tool to absolute positions."""
+        client = async_get_client_for_service_call(hass, call)
+        command = {"command": "home"}
+        
+        # First home the axes if we're setting absolute positions
+        axes = []
+        if CONF_X_POSITION in call.data:
+            axes.append("x")
+        if CONF_Y_POSITION in call.data:
+            axes.append("y") 
+        if CONF_Z_POSITION in call.data:
+            axes.append("z")
+            
+        if axes:
+            command["axes"] = axes
+            await client.issue_tool_command(command)
+            
+            # Then move to absolute positions
+            move_command = {"command": "jog", "absolute": True}
+            if CONF_X_POSITION in call.data:
+                move_command["x"] = call.data[CONF_X_POSITION]
+            if CONF_Y_POSITION in call.data:
+                move_command["y"] = call.data[CONF_Y_POSITION]
+            if CONF_Z_POSITION in call.data:
+                move_command["z"] = call.data[CONF_Z_POSITION]
+                
+            await client.issue_tool_command(move_command)
+
+    # Register services
     if not hass.services.has_service(DOMAIN, SERVICE_CONNECT):
         hass.services.async_register(
             DOMAIN,
             SERVICE_CONNECT,
             async_printer_connect,
             schema=SERVICE_CONNECT_SCHEMA,
+        )
+    
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_TOOL_TEMP):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_TOOL_TEMP,
+            async_set_tool_temperature,
+            schema=SERVICE_SET_TOOL_TEMP_SCHEMA,
+        )
+    
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_BED_TEMP):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_BED_TEMP,
+            async_set_bed_temperature,
+            schema=SERVICE_SET_BED_TEMP_SCHEMA,
+        )
+    
+    if not hass.services.has_service(DOMAIN, SERVICE_MOVE_TOOL):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_MOVE_TOOL,
+            async_move_tool,
+            schema=SERVICE_MOVE_TOOL_SCHEMA,
+        )
+    
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_POSITION):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_POSITION,
+            async_set_position,
+            schema=SERVICE_SET_POSITION_SCHEMA,
         )
 
     return True

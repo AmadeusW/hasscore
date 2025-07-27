@@ -34,10 +34,6 @@ async def async_setup_entry(
             OctoprintShutdownSystemButton(coordinator, device_id, client),
             OctoprintRebootSystemButton(coordinator, device_id, client),
             OctoprintRestartOctoprintButton(coordinator, device_id, client),
-            OctoprintSetToolTempButton(coordinator, device_id, client),
-            OctoprintSetBedTempButton(coordinator, device_id, client),
-            OctoprintMoveZAxisButton(coordinator, device_id, client),
-            OctoprintConnectPrinterButton(coordinator, device_id, client),
         ]
     )
 
@@ -216,117 +212,6 @@ class OctoprintRestartOctoprintButton(OctoprintSystemButton):
         """Handle the button press."""
         await self.client.restart()
 
-
-class OctoprintSetToolTempButton(OctoprintPrinterButton):
-    """Set tool temperature using configurable value."""
-
-    def __init__(
-        self,
-        coordinator: OctoprintDataUpdateCoordinator,
-        device_id: str,
-        client: OctoprintClient,
-    ) -> None:
-        """Initialize a new OctoPrint button."""
-        super().__init__(coordinator, "Set Tool Temperature", device_id, client)
-
-    async def async_press(self) -> None:
-        """Handle the button press."""
-        # Get the temperature value from the text entity
-        text_entity_id = f"text.octoprint_tool_temperature"
-        text_state = self.hass.states.get(text_entity_id)
-        
-        if text_state and text_state.state.isdigit():
-            temperature = int(text_state.state)
-        else:
-            temperature = 215  # Default fallback
-            
-        await self.client.set_tool_temperature(temperature, tool="tool0")
-
-
-class OctoprintSetBedTempButton(OctoprintPrinterButton):
-    """Set bed temperature using configurable value."""
-
-    def __init__(
-        self,
-        coordinator: OctoprintDataUpdateCoordinator,
-        device_id: str,
-        client: OctoprintClient,
-    ) -> None:
-        """Initialize a new OctoPrint button."""
-        super().__init__(coordinator, "Set Bed Temperature", device_id, client)
-
-    async def async_press(self) -> None:
-        """Handle the button press."""
-        # Get the temperature value from the text entity
-        text_entity_id = f"text.octoprint_bed_temperature"
-        text_state = self.hass.states.get(text_entity_id)
-        
-        if text_state and text_state.state.isdigit():
-            temperature = int(text_state.state)
-        else:
-            temperature = 60  # Default fallback
-            
-        await self.client.set_bed_temperature(temperature)
-
-
-class OctoprintMoveZAxisButton(OctoprintPrinterButton):
-    """Move tool in Z axis using configurable distance."""
-
-    def __init__(
-        self,
-        coordinator: OctoprintDataUpdateCoordinator,
-        device_id: str,
-        client: OctoprintClient,
-    ) -> None:
-        """Initialize a new OctoPrint button."""
-        super().__init__(coordinator, "Move Z Axis", device_id, client)
-
-    async def async_press(self) -> None:
-        """Handle the button press."""
-        # Get the Z move distance from the text entity
-        text_entity_id = f"text.octoprint_z_move_distance"
-        text_state = self.hass.states.get(text_entity_id)
-        
-        if text_state and text_state.state.replace('.', '').replace('-', '').isdigit():
-            z_distance = float(text_state.state)
-        else:
-            z_distance = 20.0  # Default fallback
-            
-        await self.client.issue_tool_command({"command": "jog", "z": z_distance})
-
-
-class OctoprintConnectPrinterButton(OctoprintSystemButton):
-    """Connect to printer using configurable settings."""
-
-    def __init__(
-        self,
-        coordinator: OctoprintDataUpdateCoordinator,
-        device_id: str,
-        client: OctoprintClient,
-    ) -> None:
-        """Initialize a new OctoPrint button."""
-        super().__init__(coordinator, "Connect Printer", device_id, client)
-
-    async def async_press(self) -> None:
-        """Handle the button press."""
-        # Get connection settings from text entities
-        profile_entity_id = f"text.octoprint_printer_profile"
-        port_entity_id = f"text.octoprint_serial_port"
-        baud_entity_id = f"text.octoprint_baud_rate"
-        
-        profile_state = self.hass.states.get(profile_entity_id)
-        port_state = self.hass.states.get(port_entity_id)
-        baud_state = self.hass.states.get(baud_entity_id)
-        
-        printer_profile = profile_state.state if profile_state else "Prusa"
-        port = port_state.state if port_state else "/dev/ttyACM0"
-        baud_rate = int(baud_state.state) if baud_state and baud_state.state.isdigit() else 115200
-        
-        await self.client.connect(
-            printer_profile=printer_profile,
-            port=port,
-            baud_rate=baud_rate
-        )
 
 
 class InvalidPrinterState(HomeAssistantError):

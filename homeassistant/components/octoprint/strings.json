@@ -63,6 +63,78 @@
           "description": "Baud rate."
         }
       }
+    },
+    "set_tool_temperature": {
+      "name": "Set tool temperature",
+      "description": "Sets the target temperature for the printer's tool (hotend).",
+      "fields": {
+        "device_id": {
+          "name": "Server",
+          "description": "The OctoPrint server to send the command to."
+        },
+        "tool_temperature": {
+          "name": "Tool temperature",
+          "description": "Target temperature for the tool in degrees Celsius (0-400°C)."
+        }
+      }
+    },
+    "set_bed_temperature": {
+      "name": "Set bed temperature", 
+      "description": "Sets the target temperature for the printer's heated bed.",
+      "fields": {
+        "device_id": {
+          "name": "Server",
+          "description": "The OctoPrint server to send the command to."
+        },
+        "bed_temperature": {
+          "name": "Bed temperature",
+          "description": "Target temperature for the bed in degrees Celsius (0-150°C)."
+        }
+      }
+    },
+    "move_tool": {
+      "name": "Move tool",
+      "description": "Moves the printer tool by relative offsets in millimeters.",
+      "fields": {
+        "device_id": {
+          "name": "Server",
+          "description": "The OctoPrint server to send the command to."
+        },
+        "x_offset": {
+          "name": "X offset",
+          "description": "Distance to move in X direction (mm). Positive values move right, negative left."
+        },
+        "y_offset": {
+          "name": "Y offset", 
+          "description": "Distance to move in Y direction (mm). Positive values move away from origin, negative toward."
+        },
+        "z_offset": {
+          "name": "Z offset",
+          "description": "Distance to move in Z direction (mm). Positive values move up, negative down."
+        }
+      }
+    },
+    "set_position": {
+      "name": "Set position",
+      "description": "Moves the printer tool to absolute positions after homing the specified axes.",
+      "fields": {
+        "device_id": {
+          "name": "Server",
+          "description": "The OctoPrint server to send the command to."
+        },
+        "x_position": {
+          "name": "X position",
+          "description": "Absolute X position in millimeters (0-500mm)."
+        },
+        "y_position": {
+          "name": "Y position",
+          "description": "Absolute Y position in millimeters (0-500mm)."
+        },
+        "z_position": {
+          "name": "Z position", 
+          "description": "Absolute Z position in millimeters (0-500mm)."
+        }
+      }
     }
   }
 }
