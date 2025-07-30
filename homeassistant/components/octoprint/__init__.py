@@ -272,7 +272,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Set tool temperature."""
         client = async_get_client_for_service_call(hass, call)
         temperature = call.data[CONF_TOOL_TEMP]
-        await client.set_tool_temperature(temperature, tool="tool0")
+        await client.set_tool_temperature("tool0", temperature)  # Assuming single hot-end
 
     async def async_set_bed_temperature(call: ServiceCall) -> None:
         """Set bed temperature."""
@@ -283,16 +283,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def async_move_tool(call: ServiceCall) -> None:
         """Move tool by relative offsets."""
         client = async_get_client_for_service_call(hass, call)
-        command = {"command": "jog"}
-        
-        if CONF_X_OFFSET in call.data:
-            command["x"] = call.data[CONF_X_OFFSET]
-        if CONF_Y_OFFSET in call.data:
-            command["y"] = call.data[CONF_Y_OFFSET]
-        if CONF_Z_OFFSET in call.data:
-            command["z"] = call.data[CONF_Z_OFFSET]
-            
-        await client.issue_tool_command(command)
+        x = call.data.get(CONF_X_OFFSET, 0)
+        y = call.data.get(CONF_Y_OFFSET, 0)
+        z = call.data.get(CONF_Z_OFFSET, 0)
+        await client.jog_printhead(x, y, z)
 
     async def async_set_position(call: ServiceCall) -> None:
         """Set tool to absolute positions."""
